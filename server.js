@@ -187,12 +187,14 @@ app.get('/', (req, res) => {
 app.use(errorHandler);
 
 // Start Server
-app.listen(config.port, () => {
-  console.log(`[API] Server started on http://localhost:${config.port}`);
-  console.log(`[API] 🎬 Video.js Player Dev Tool: http://localhost:${config.port}/dev/player`);
-  console.log(`[API] 📺 Iframe Proxy Tester:    http://localhost:${config.port}/dev/iframe`);
-  console.log(`[API] ⚡ Scraper Extractor:      http://localhost:${config.port}/dev/extract`);
-  console.log(`[API] 🎯 Target Scraper URL:     ${config.animeWorldIndiaUrl}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(config.port, () => {
+    console.log(`[API] Server started on http://localhost:${config.port}`);
+    console.log(`[API] 🎬 Video.js Player Dev Tool: http://localhost:${config.port}/dev/player`);
+    console.log(`[API] 📺 Iframe Proxy Tester:    http://localhost:${config.port}/dev/iframe`);
+    console.log(`[API] ⚡ Scraper Extractor:      http://localhost:${config.port}/dev/extract`);
+    console.log(`[API] 🎯 Target Scraper URL:     ${config.animeWorldIndiaUrl}`);
+  });
+}
 
 module.exports = app;

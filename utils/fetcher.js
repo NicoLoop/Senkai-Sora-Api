@@ -213,6 +213,55 @@ async function fetchViaAnimeSaltMirror(targetUrl, options = {}) {
 }
 
 /**
+ * Attempt 2: Route request through the high-speed Corsfix proxy (bypasses Cloudflare)
+ */
+async function fetchViaCorsfix(targetUrl, options = {}) {
+  const timeout = options.timeout || config.scraperTimeoutMs || 15000;
+  const startTime = Date.now();
+  const corsfixUrl = `https://proxy-ap.corsfix.com/?${targetUrl}`;
+
+  try {
+    const response = await axios.get(corsfixUrl, {
+      headers: {
+        'Origin': 'http://localhost:3000',
+        'User-Agent': options.userAgent || config.defaultUserAgent,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9,hi;q=0.8'
+      },
+      timeout,
+      maxRedirects: 5,
+      validateStatus: () => true,
+      responseType: 'text'
+    });
+
+    const elapsedMs = Date.now() - startTime;
+    const html = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+    const isBlocked = isCloudflareChallenge(response.status, html) || html.includes('corsfix_error');
+
+    if (response.status >= 200 && response.status < 400 && !isBlocked) {
+      return {
+        success: true,
+        blocked: false,
+        url: targetUrl,
+        finalUrl: targetUrl,
+        statusCode: response.status,
+        statusText: response.statusText,
+        elapsedMs,
+        contentLength: Buffer.byteLength(html, 'utf8'),
+        contentType: response.headers['content-type'] || 'text/html',
+        headers: response.headers,
+        html,
+        viaCorsfix: true
+      };
+    }
+    return null;
+  } catch (err) {
+    console.warn(`[Fetcher] Corsfix proxy failed for ${targetUrl}:`, err.message);
+    return null;
+  }
+}
+
+/**
  * Fetch raw HTML or assets from target URL with realistic browser headers,
  * automatic proxy delegation and Cloudflare challenge evasion.
  */
@@ -232,22 +281,29 @@ async function fetchPageHtml(targetUrl, options = {}) {
     return directResult;
   }
 
-  // 2. If direct fetch was challenged by Cloudflare or failed, route through Railway Proxy
+  // 2. If direct fetch was challenged by Cloudflare or failed, use Corsfix proxy
   if (directResult.blocked || !directResult.success) {
-    console.log(`[Fetcher] Direct fetch blocked (${directResult.statusCode}) for ${targetUrl}. Routing through Railway proxy...`);
+    console.log(`[Fetcher] Direct fetch blocked (${directResult.statusCode}) for ${targetUrl}. Trying Corsfix proxy...`);
+    const corsfixResult = await fetchViaCorsfix(targetUrl, options);
+    if (corsfixResult && corsfixResult.success) {
+      return corsfixResult;
+    }
+
+    // 3. If Corsfix proxy failed, route through Railway Proxy
+    console.log(`[Fetcher] Routing ${targetUrl} through Railway proxy...`);
     const proxyResult = await fetchViaProxy(targetUrl, options);
     if (proxyResult && proxyResult.success) {
       return proxyResult;
     }
 
-    // 3. If Railway proxy also failed or was blocked, fallback to AnimeSalt mirror
+    // 4. If Railway proxy also failed or was blocked, fallback to AnimeSalt mirror
     const mirrorResult = await fetchViaAnimeSaltMirror(targetUrl, options);
     if (mirrorResult && mirrorResult.success) {
       return mirrorResult;
     }
   }
 
-  // If all three tiers failed, return the direct result with detailed diagnostics
+  // If all tiers failed, return the direct result with detailed diagnostics
   return directResult;
 }
 
@@ -255,5 +311,6 @@ module.exports = {
   fetchPageHtml,
   fetchDirect,
   fetchViaProxy,
+  fetchViaCorsfix,
   isCloudflareChallenge
 };

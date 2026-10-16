@@ -28,8 +28,10 @@ const config = {
   // Default referer used for proxying video player embeds
   defaultReferer: 'https://watchanimeworld.one/',
 
-  // Default desktop browser User-Agent
-  defaultUserAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
+  // Default desktop browser User-Agent matching modern Chrome
+  defaultUserAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
 };
+
+config.proxyScrapeUrl = `${config.abyssProxyUrl.replace(/\/+$/, '')}/proxy/scrape`;
 
 module.exports = config;

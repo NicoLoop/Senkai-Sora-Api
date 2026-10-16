@@ -27,9 +27,20 @@ function isCloudflareChallenge(statusCode, html) {
 }
 
 /**
- * Builds realistic Chrome 132 desktop browser headers without bot fingerprints.
+ * Builds realistic Chrome 132 desktop browser headers without bot fingerprints,
+ * automatically applying the target domain referer.
  */
-function getBrowserHeaders(options = {}) {
+function getBrowserHeaders(targetUrl, options = {}) {
+  let targetOrigin = '';
+  try {
+    targetOrigin = new URL(targetUrl).origin + '/';
+  } catch {
+    targetOrigin = targetUrl;
+  }
+
+  const referer = options.referer || options.ref || targetOrigin;
+  const isSameOrigin = targetOrigin && referer && referer.startsWith(targetOrigin.replace(/\/+$/, ''));
+
   const headers = {
     'User-Agent': options.userAgent || config.defaultUserAgent,
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -40,10 +51,11 @@ function getBrowserHeaders(options = {}) {
     'sec-ch-ua-platform': '"Windows"',
     'Sec-Fetch-Dest': 'document',
     'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-Site': isSameOrigin ? 'same-origin' : 'none',
     'Sec-Fetch-User': '?1',
     'Upgrade-Insecure-Requests': '1',
     'Cache-Control': 'max-age=0',
+    'Referer': referer,
     ...(options.headers || {})
   };
 
@@ -54,10 +66,6 @@ function getBrowserHeaders(options = {}) {
     headers['Sec-Fetch-Dest'] = 'document';
   }
 
-  if (options.referer) {
-    headers['Referer'] = options.referer;
-  }
-
   return headers;
 }
 
@@ -66,7 +74,7 @@ function getBrowserHeaders(options = {}) {
  */
 async function fetchDirect(targetUrl, options = {}) {
   const timeout = options.timeout || config.scraperTimeoutMs || 10000;
-  const headers = getBrowserHeaders(options);
+  const headers = getBrowserHeaders(targetUrl, options);
   const startTime = Date.now();
 
   try {
@@ -125,12 +133,21 @@ async function fetchViaProxy(targetUrl, options = {}) {
   const startTime = Date.now();
   const timeout = options.timeout || 15000;
 
+  let targetOrigin = '';
+  try {
+    targetOrigin = new URL(targetUrl).origin + '/';
+  } catch {
+    targetOrigin = targetUrl;
+  }
+
+  const referer = options.referer || options.ref || targetOrigin;
+
   try {
     const res = await axios.get(proxyEndpoint, {
       params: {
         url: targetUrl,
+        referer,
         userAgent: options.userAgent || config.defaultUserAgent,
-        referer: options.referer,
         timeout
       },
       headers: {
@@ -218,12 +235,19 @@ async function fetchViaAnimeSaltMirror(targetUrl, options = {}) {
 async function fetchViaCorsfix(targetUrl, options = {}) {
   const timeout = options.timeout || config.scraperTimeoutMs || 15000;
   const startTime = Date.now();
-  const corsfixUrl = `https://proxy-ap.corsfix.com/?${targetUrl}`;
+  let targetOrigin = '';
+  try {
+    targetOrigin = new URL(targetUrl).origin + '/';
+  } catch {
+    targetOrigin = targetUrl;
+  }
+  const referer = options.referer || options.ref || targetOrigin;
 
   try {
     const response = await axios.get(corsfixUrl, {
       headers: {
         'Origin': 'http://localhost:3000',
+        'Referer': referer,
         'User-Agent': options.userAgent || config.defaultUserAgent,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9,hi;q=0.8'

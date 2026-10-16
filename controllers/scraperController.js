@@ -69,6 +69,45 @@ class ScraperController {
   }
 
   /**
+   * GET/POST /proxy/scrape or /scrape or /proxy/html
+   * Direct high-speed proxy endpoint hosted directly on the API
+   */
+  async scrapeProxy(req, res, next) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+
+    const targetUrl = (req.query.url || req.body?.url || config.animeWorldIndiaUrl).trim();
+
+    if (!isValidHttpUrl(targetUrl)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing or invalid url parameter (?url=https://...)'
+      });
+    }
+
+    try {
+      const options = {
+        userAgent: req.query.userAgent || req.body?.userAgent,
+        headers: req.body?.headers || {},
+        referer: req.query.referer || req.query.ref || req.body?.referer || req.body?.ref,
+        timeout: req.query.timeout || req.body?.timeout
+      };
+
+      const result = await scraperService.extractRaw(targetUrl, options);
+
+      if (req.query.raw === 'true' || req.query.format === 'html') {
+        res.setHeader('Content-Type', result.contentType || 'text/html; charset=utf-8');
+        return res.status(result.statusCode || 200).send(result.html);
+      }
+
+      return res.status(result.statusCode >= 200 && result.statusCode < 400 ? 200 : (result.statusCode || 500)).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
    * GET /api/v1/animeworldin/home
    * Scrapes complete AnimeWorld India homepage into all 10 categorized sections
    */

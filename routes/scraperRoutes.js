@@ -2,10 +2,13 @@ const express = require('express');
 const router = express.Router();
 const scraperController = require('../controllers/scraperController');
 
-// Extractor routes
+// Extractor & Direct Proxy routes
 router.post('/extract', scraperController.extractPost);
 router.get('/extract', scraperController.extractGet);
 router.get('/extract/raw', scraperController.extractRawText);
+router.all('/proxy/scrape', scraperController.scrapeProxy);
+router.all('/scrape', scraperController.scrapeProxy);
+router.all('/proxy/html', scraperController.scrapeProxy);
 
 // AnimeWorld Scraper Endpoints
 router.get('/home', scraperController.getHome);

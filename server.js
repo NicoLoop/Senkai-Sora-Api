@@ -6,6 +6,7 @@ const errorHandler = require('./middlewares/errorHandler');
 
 const apiRoutes = require('./routes');
 const devRoutes = require('./routes/devRoutes');
+const scraperRoutes = require('./routes/scraperRoutes');
 const playerController = require('./controllers/playerController');
 const playerExtractorController = require('./controllers/playerExtractorController');
 
@@ -121,6 +122,9 @@ app.get([
 
 // Dev Tools Pages: /dev/extract, /dev/iframe
 app.use('/dev', devRoutes);
+
+// Root scraper & proxy endpoints (/proxy/scrape, /scrape, /extract)
+app.use('/', scraperRoutes);
 
 // API Routes: /api/...
 app.use('/api', apiRoutes);

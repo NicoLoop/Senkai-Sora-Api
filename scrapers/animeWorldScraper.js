@@ -292,12 +292,33 @@ class AnimeWorldScraper {
     let seasonsData = [];
 
     if (seasonTabs.length > 0 && typeof fetchSeasonAjaxFn === 'function') {
-      // Fetch episodes for all seasons in parallel
-      seasonsData = await Promise.all(
-        seasonTabs.map(async (s) => {
+      // Fetch episodes in controlled concurrent batches of 5 with 1 retry to avoid rate-limits
+      const fetchConcurrent = async (items, limit, workerFn) => {
+        const results = [];
+        for (let i = 0; i < items.length; i += limit) {
+          const chunk = items.slice(i, i + limit);
+          const chunkResults = await Promise.all(chunk.map(workerFn));
+          results.push(...chunkResults);
+        }
+        return results;
+      };
+
+      seasonsData = await fetchConcurrent(
+        seasonTabs,
+        5,
+        async (s) => {
           try {
-            const rawAjaxHtml = await fetchSeasonAjaxFn(s.season, s.post);
-            const $s = cheerio.load(rawAjaxHtml);
+            let rawAjaxHtml = '';
+            for (let attempt = 0; attempt < 2; attempt++) {
+              try {
+                rawAjaxHtml = await fetchSeasonAjaxFn(s.season, s.post);
+                if (rawAjaxHtml && rawAjaxHtml.length > 50) break;
+              } catch (err) {
+                if (attempt === 1) throw err;
+                await new Promise(r => setTimeout(r, 200));
+              }
+            }
+            const $s = cheerio.load(rawAjaxHtml || '');
             const episodes = [];
             const seen = new Set();
 
@@ -349,7 +370,7 @@ class AnimeWorldScraper {
               episodes: matching
             };
           }
-        })
+        }
       );
     } else {
       // Single season or direct episodes list on page

@@ -406,13 +406,21 @@ class ScraperService {
 
     // 2. PlayX Server
     if (playXData) {
-      const streamUrl = playXData.videoSource || playXData.securedLink;
+      const rawStreamUrl = playXData.videoSource || playXData.securedLink;
+      const proxyBase = (config.abyssProxyUrl || 'https://abyss-proxies-production.up.railway.app').replace(/\/+$/, '');
+      const streamUrl = rawStreamUrl
+        ? (rawStreamUrl.includes('/player/stream/proxy')
+            ? rawStreamUrl
+            : `${proxyBase}/player/stream/proxy?url=${encodeURIComponent(rawStreamUrl)}&videoId=${cleanPlayXId || ''}`)
+        : null;
+
       const playXServer = {
         serverName: 'playx',
         server: 'PlayX',
         streamUrl,
         sourceUrl: streamUrl,
         videoSource: streamUrl,
+        rawVideoSource: rawStreamUrl,
         videoImage: playXData.videoImage || null,
         hls: playXData.hls !== false,
         languages: [
@@ -425,6 +433,7 @@ class ScraperService {
             sourceUrl: streamUrl,
             videoSource: streamUrl,
             link: streamUrl,
+            rawVideoSource: rawStreamUrl,
             hls: playXData.hls !== false,
             videoImage: playXData.videoImage || null
           }

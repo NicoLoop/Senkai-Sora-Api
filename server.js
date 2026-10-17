@@ -14,6 +14,32 @@ const app = express();
 
 // Middlewares
 app.use(corsMiddleware);
+
+// URL Recovery Middleware for Vercel Serverless / reverse-proxy rewrite edge cases
+app.use((req, res, next) => {
+  if (
+    req.url === '/server.js' ||
+    req.url.startsWith('/server.js?') ||
+    req.url.startsWith('/server.js/') ||
+    req.url === '/index.js' ||
+    req.url.startsWith('/index.js?') ||
+    req.url.startsWith('/index.js/')
+  ) {
+    const originalPath =
+      req.headers['x-matched-path'] ||
+      req.headers['x-vercel-original-url'] ||
+      req.headers['x-forwarded-uri'] ||
+      req.headers['x-original-url'];
+
+    if (originalPath) {
+      const queryIdx = req.url.indexOf('?');
+      const query = queryIdx !== -1 ? req.url.slice(queryIdx) : '';
+      req.url = originalPath.includes('?') ? originalPath : `${originalPath}${query}`;
+    }
+  }
+  next();
+});
+
 app.use(requestLogger);
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));

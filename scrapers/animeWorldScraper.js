@@ -250,13 +250,42 @@ class AnimeWorldScraper {
 
     // Detected Seasons from .choose-season
     const seasonTabs = [];
-    $('.choose-season .sel-temp a').each((_, el) => {
+    const seenSeasons = new Set();
+    $('.choose-season .sel-temp a, .choose-season a, [data-season]').each((_, el) => {
       const sNum = $(el).attr('data-season');
-      const post = $(el).attr('data-post');
+      const post = $(el).attr('data-post') || $('article[id*="post-"]').attr('id')?.replace(/\D+/g, '') || $('input[name="post_id"]').val();
+      if (!sNum || seenSeasons.has(sNum)) return;
+      seenSeasons.add(sNum);
       const sName = $(el).text().trim() || `Season ${sNum}`;
-      if (sNum && post) {
-        seasonTabs.push({ season: parseInt(sNum, 10), post, name: sName });
-      }
+      seasonTabs.push({ season: parseInt(sNum, 10), post, name: sName });
+    });
+
+    // Pre-extract any episodes directly present on initial page HTML (e.g. active season)
+    const mainPageEpisodes = [];
+    const seenMain = new Set();
+    $('#episode_by_temp article.post, ul.post-lst article.post, a[href*="/episode/"]').each((_, el) => {
+      const $el = $(el);
+      const a = $el.is('a') ? $el : $el.find('a.lnk-blk, a[href*="/episode/"]').first();
+      const href = a.attr('href');
+      if (!href || seenMain.has(href)) return;
+      seenMain.add(href);
+
+      const epId = extractIdFromUrl(href);
+      const epTitle = cleanTitle($el.find('.entry-title, h2, h3').text()) || cleanTitle(a.attr('title'));
+      const epImg = normalizeUrl($el.find('img').attr('data-src') || $el.find('img').attr('src'));
+      const numMatch = epId.match(/(?:(\d+)x)?(\d+)/);
+      const sNum = numMatch && numMatch[1] ? parseInt(numMatch[1], 10) : null;
+      const epNum = numMatch && numMatch[2] ? parseInt(numMatch[2], 10) : mainPageEpisodes.length + 1;
+
+      mainPageEpisodes.push({
+        season: sNum,
+        episode: epNum,
+        title: epTitle || `Episode ${epNum}`,
+        id: epId,
+        link: href ? normalizeUrl(href) : null,
+        url: href ? normalizeUrl(href) : null,
+        image: epImg || null
+      });
     });
 
     // Extract episodes:
@@ -288,57 +317,50 @@ class AnimeWorldScraper {
                 episode: epNum,
                 title: epTitle || `Episode ${epNum}`,
                 id: epId,
+                link: href ? normalizeUrl(href) : null,
+                url: href ? normalizeUrl(href) : null,
                 image: epImg || null
               });
             });
 
+            // If ajax returned no episodes, fallback to main page episodes matching this season
+            if (episodes.length === 0 && mainPageEpisodes.length > 0) {
+              const matching = mainPageEpisodes.filter(e => e.season === s.season || (!e.season && s.season === 1));
+              if (matching.length > 0) {
+                episodes.push(...matching);
+              }
+            }
+
             return {
               season: s.season,
               name: s.name,
+              title: s.name,
               episodesCount: episodes.length,
               episodes
             };
           } catch (e) {
+            console.warn(`[Scraper] Season ${s.season} AJAX error:`, e.message);
+            const matching = mainPageEpisodes.filter(e => e.season === s.season || (!e.season && s.season === 1));
             return {
               season: s.season,
               name: s.name,
-              episodesCount: 0,
-              episodes: []
+              title: s.name,
+              episodesCount: matching.length,
+              episodes: matching
             };
           }
         })
       );
     } else {
       // Single season or direct episodes list on page
-      const directEpisodes = [];
-      const seen = new Set();
-      $('#episode_by_temp article.post, ul.post-lst article.post, a[href*="/episode/"]').each((_, el) => {
-        const $el = $(el);
-        const a = $el.is('a') ? $el : $el.find('a.lnk-blk, a[href*="/episode/"]').first();
-        const href = a.attr('href');
-        if (!href || seen.has(href)) return;
-        seen.add(href);
-
-        const epId = extractIdFromUrl(href);
-        const epTitle = cleanTitle($el.find('.entry-title, h2, h3').text()) || cleanTitle(a.attr('title'));
-        const epImg = normalizeUrl($el.find('img').attr('data-src') || $el.find('img').attr('src'));
-        const numMatch = epId.match(/(?:(\d+)x)?(\d+)/);
-        const epNum = numMatch && numMatch[2] ? parseInt(numMatch[2], 10) : directEpisodes.length + 1;
-
-        directEpisodes.push({
-          episode: epNum,
-          title: epTitle || `Episode ${epNum}`,
-          id: epId,
-          image: epImg || null
-        });
-      });
-
+      const episodes = mainPageEpisodes.length > 0 ? mainPageEpisodes : [];
       seasonsData = [
         {
           season: 1,
           name: 'Season 1',
-          episodesCount: directEpisodes.length,
-          episodes: directEpisodes
+          title: 'Season 1',
+          episodesCount: episodes.length,
+          episodes
         }
       ];
     }

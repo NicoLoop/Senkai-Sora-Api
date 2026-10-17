@@ -191,7 +191,11 @@ async function fetchViaAnimeSaltMirror(targetUrl, options = {}) {
     const altUrl = `${saltBase}${parsed.pathname}${parsed.search}`;
 
     console.log(`[Fetcher] Failing over to AnimeSalt mirror: ${altUrl}`);
-    const altResult = await fetchDirect(altUrl, options);
+    const saltOptions = {
+      ...options,
+      referer: options.referer ? options.referer.replace(parsed.origin, saltBase) : `${saltBase}/`
+    };
+    const altResult = await fetchDirect(altUrl, saltOptions);
     if (altResult.success) {
       return {
         ...altResult,

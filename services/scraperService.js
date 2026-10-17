@@ -128,22 +128,14 @@ class ScraperService {
       throw new Error(`Failed to fetch anime page at ${targetUrl}: ${fetchResult.error || fetchResult.statusText}`);
     }
 
-    // Ajax helper for fetching other seasons
+    // Ajax helper for fetching other seasons using Cloudflare solver fetchPageHtml
     const fetchSeasonAjax = async (seasonNum, postId) => {
-      const ajaxEndpoint = `${config.animeWorldIndiaUrl.replace(/\/+$/, '')}/wp-admin/admin-ajax.php`;
-      const ajaxRes = await axios.get(ajaxEndpoint, {
-        params: {
-          action: 'action_select_season',
-          season: seasonNum,
-          post: postId
-        },
-        headers: {
-          'User-Agent': config.defaultUserAgent,
-          'Referer': targetUrl
-        },
-        timeout: 10000
-      });
-      return ajaxRes.data;
+      const ajaxUrl = `${config.animeWorldIndiaUrl.replace(/\/+$/, '')}/wp-admin/admin-ajax.php?action=action_select_season&season=${encodeURIComponent(seasonNum)}&post=${encodeURIComponent(postId)}`;
+      const ajaxRes = await fetchPageHtml(ajaxUrl, { referer: targetUrl });
+      if (!ajaxRes.success || !ajaxRes.html) {
+        throw new Error(`Failed to fetch season ${seasonNum} via ajax: ${ajaxRes.error || ajaxRes.statusText}`);
+      }
+      return ajaxRes.html;
     };
 
     const animeData = await animeWorldScraper.parseAnimeDetailsWithSeasons(

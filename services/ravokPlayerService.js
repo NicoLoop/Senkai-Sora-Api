@@ -216,7 +216,7 @@ class RavokPlayerService {
 
     // 7. Structure streaming source pointing to dedicated proxy server
     const rawVideoSource = videoData.videoSource || videoData.securedLink || null;
-    const isHls = videoData.hls !== false && (rawVideoSource ? rawVideoSource.includes('.m3u8') : true);
+    const isHls = videoData.hls !== false && (rawVideoSource ? (rawVideoSource.includes('.m3u8') || rawVideoSource.includes('/hls/')) : true);
 
     let streamProxyUrl = null;
     if (rawVideoSource) {
